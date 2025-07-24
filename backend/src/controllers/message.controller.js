@@ -1,5 +1,6 @@
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
+import FriendRequest from "../models/friendRequest.model.js";
 
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
@@ -7,11 +8,26 @@ import { getReceiverSocketId, io } from "../lib/socket.js";
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+    // Find accepted friends
+    const requests = await FriendRequest.find({
+      $or: [
+        { sender: loggedInUserId },
+        { receiver: loggedInUserId },
+      ],
+      status: "accepted",
+    })
+      .populate("sender", "fullName userTag profilePic")
+      .populate("receiver", "fullName userTag profilePic");
 
-    // Get unread message counts for each user
+    // Get the other user as friend
+    const friends = requests.map((req) => {
+      const friend = req.sender._id.equals(loggedInUserId) ? req.receiver : req.sender;
+      return friend;
+    });
+
+    // Get unread message counts for each friend
     const usersWithUnreadCounts = await Promise.all(
-      filteredUsers.map(async (user) => {
+      friends.map(async (user) => {
         const unreadCount = await Message.countDocuments({
           senderId: user._id,
           receiverId: loggedInUserId,

@@ -20,9 +20,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    userTag: {
+      type: String,
+      required: true,
+      match: /^\d{4}$/,
+    },
   },
   { timestamps: true }
 );
+
+userSchema.index({ email: 1, userTag: 1 }, { unique: true });
 
 const User = mongoose.model("User", userSchema);
 

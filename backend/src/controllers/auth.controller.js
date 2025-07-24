@@ -4,19 +4,23 @@ import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
 
 export const signup = async (req, res) => {
-  const { fullName, email, password } = req.body;
+  const { fullName, email, password, userTag } = req.body;
   try {
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !password || !userTag) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (!/^\d{4}$/.test(userTag)) {
+      return res.status(400).json({ message: "User tag must be a 4-digit number" });
     }
 
     if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email, userTag });
 
-    if (user) return res.status(400).json({ message: "Email already exists" });
+    if (user) return res.status(400).json({ message: "Email and user tag combination already exists" });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -25,6 +29,7 @@ export const signup = async (req, res) => {
       fullName,
       email,
       password: hashedPassword,
+      userTag,
     });
 
     if (newUser) {
@@ -36,6 +41,7 @@ export const signup = async (req, res) => {
         _id: newUser._id,
         fullName: newUser.fullName,
         email: newUser.email,
+        userTag: newUser.userTag,
         profilePic: newUser.profilePic,
       });
     } else {
@@ -137,5 +143,19 @@ export const checkAuth = (req, res) => {
   } catch (error) {
     console.log("Error in checkAuth controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const searchUserByTag = async (req, res) => {
+  const { userTag } = req.query;
+  if (!/^\d{4}$/.test(userTag)) {
+    return res.status(400).json({ message: "Invalid 4-digit ID" });
+  }
+  try {
+    const user = await User.findOne({ userTag }).select("_id fullName userTag profilePic");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
   }
 };
